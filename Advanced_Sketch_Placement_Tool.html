@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Advanced Sketch Placement Tool</title>
+<style>
+body{font-family:Arial;max-width:800px;margin:auto;padding:15px;background:#f5f5f5}
+canvas{border:2px solid #000;background:#fff;max-width:100%;touch-action:none}
+label,input,select,button{display:block;width:100%;margin:8px 0;padding:8px;box-sizing:border-box}
+.controls{background:#fff;padding:10px;border-radius:10px}
+</style>
+</head>
+<body>
+<h2>Advanced Sketch Placement Tool</h2>
+
+<div class="controls">
+<input type="file" id="imageInput" accept="image/*">
+
+<select id="paperType">
+<option value="21,29.7">A4</option>
+<option value="29.7,42">A3</option>
+<option value="custom">Custom</option>
+</select>
+
+<input type="number" id="cw" placeholder="Custom width (cm)">
+<input type="number" id="ch" placeholder="Custom height (cm)">
+
+<label>Scale <span id="sv">100%</span></label>
+<input type="range" id="scale" min="10" max="100" value="100">
+
+<label><input type="checkbox" id="grid"> Show 1 cm Grid</label>
+<label><input type="checkbox" id="thirds"> Rule of Thirds</label>
+<label><input type="checkbox" id="safe"> Safe Area</label>
+
+<button onclick="saveProject()">Save Project</button>
+<button onclick="loadProject()">Load Project</button>
+</div>
+
+<canvas id="c"></canvas>
+<p id="result"></p>
+
+<script>
+const canvas=c=document.getElementById('c');
+const ctx=c.getContext('2d');
+const img=new Image();
+let offX=0,offY=0,drag=false,sx=0,sy=0;
+
+function paper(){
+ if(paperType.value==="custom"){
+  return [+cw.value,+ch.value];
+ }
+ return paperType.value.split(',').map(Number);
+}
+
+imageInput.onchange=e=>{
+ const f=e.target.files[0];
+ if(!f)return;
+ const r=new FileReader();
+ r.onload=x=>{img.onload=draw;img.src=x.target.result;}
+ r.readAsDataURL(f);
+};
+
+scale.oninput=()=>{sv.textContent=scale.value+"%";draw();}
+paperType.onchange=draw;
+cw.oninput=draw;
+ch.oninput=draw;
+grid.onchange=draw;
+thirds.onchange=draw;
+safe.onchange=draw;
+
+canvas.onmousedown=e=>{drag=true;sx=e.offsetX;sy=e.offsetY;}
+canvas.onmouseup=()=>drag=false;
+canvas.onmousemove=e=>{
+ if(!drag)return;
+ offX+=e.offsetX-sx;
+ offY+=e.offsetY-sy;
+ sx=e.offsetX; sy=e.offsetY;
+ draw();
+};
+
+function draw(){
+ if(!img.src)return;
+ const p=paper();
+ if(!p[0]||!p[1]) return;
+
+ const ds=15;
+ c.width=p[0]*ds;
+ c.height=p[1]*ds;
+
+ ctx.fillStyle="white";
+ ctx.fillRect(0,0,c.width,c.height);
+
+ if(grid.checked){
+  ctx.strokeStyle="#ddd";
+  for(let x=0;x<c.width;x+=ds){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke();}
+  for(let y=0;y<c.height;y+=ds){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke();}
+ }
+
+ if(thirds.checked){
+  ctx.strokeStyle="green";
+  [1/3,2/3].forEach(v=>{
+   ctx.beginPath();ctx.moveTo(c.width*v,0);ctx.lineTo(c.width*v,c.height);ctx.stroke();
+   ctx.beginPath();ctx.moveTo(0,c.height*v);ctx.lineTo(c.width,c.height*v);ctx.stroke();
+  });
+ }
+
+ if(safe.checked){
+  ctx.strokeStyle="orange";
+  ctx.strokeRect(ds/2,ds/2,c.width-ds,c.height-ds);
+ }
+
+ let sw=c.width*(scale.value/100);
+ let sh=sw/(img.width/img.height);
+
+ if(sh>c.height*(scale.value/100)){
+  sh=c.height*(scale.value/100);
+  sw=sh*(img.width/img.height);
+ }
+
+ const x=(c.width-sw)/2+offX;
+ const y=(c.height-sh)/2+offY;
+
+ ctx.drawImage(img,x,y,sw,sh);
+ ctx.strokeStyle="red";
+ ctx.strokeRect(x,y,sw,sh);
+
+ result.innerHTML=
+ `Sketch: ${(sw/ds).toFixed(1)} × ${(sh/ds).toFixed(1)} cm`;
+}
+
+function saveProject(){
+ localStorage.setItem("sketchTool",JSON.stringify({
+  scale:scale.value,offX,offY,paper:paperType.value,cw:cw.value,ch:ch.value
+ }));
+ alert("Project saved");
+}
+
+function loadProject(){
+ const d=JSON.parse(localStorage.getItem("sketchTool"));
+ if(!d)return;
+ scale.value=d.scale;
+ sv.textContent=d.scale+"%";
+ offX=d.offX; offY=d.offY;
+ paperType.value=d.paper;
+ cw.value=d.cw; ch.value=d.ch;
+ draw();
+}
+</script>
+</body>
+</html>
